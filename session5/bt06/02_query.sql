@@ -1,99 +1,106 @@
--- 02_query.sql
--- [Giỏi] Online store analytics
--- Run on DB: OnlineStoreDB
-
--- 1) ALIAS: danh sách tất cả đơn hàng: customer_name, order_date, total_amount
+-- 1) ALIAS: danh sách nhân viên (Tên nhân viên, Phòng ban, Lương)
+-- =========================================================
 SELECT
-    c.customer_name AS customer_name,
-    o.order_date    AS order_date,
-    o.total_amount  AS total_amount
-FROM customers c
-JOIN orders o ON o.customer_id = c.customer_id
-ORDER BY o.order_id;
+    e.emp_name  AS "Tên nhân viên",
+    d.dept_name AS "Phòng ban",
+    e.salary    AS "Lương"
+FROM employees e
+JOIN departments d ON d.dept_id = e.dept_id
+ORDER BY e.emp_id;
 
-
--- 2) Aggregate Functions: SUM, AVG, MAX, MIN, COUNT
+-- =========================================================
+-- 2) Aggregate Functions: tổng quỹ lương, lương TB, max/min, số nhân viên
+-- =========================================================
 SELECT
-    SUM(o.total_amount) AS total_revenue,
-    AVG(o.total_amount) AS avg_order_amount,
-    MAX(o.total_amount) AS max_order_amount,
-    MIN(o.total_amount) AS min_order_amount,
-    COUNT(o.order_id)   AS order_count
-FROM orders o;
+    SUM(salary)  AS total_salary,
+    AVG(salary)  AS avg_salary,
+    MAX(salary)  AS max_salary,
+    MIN(salary)  AS min_salary,
+    COUNT(emp_id) AS employee_count
+FROM employees;
 
-
+-- =========================================================
 -- 3) GROUP BY / HAVING:
--- 3a) Tổng doanh thu theo thành phố
+-- 3a) lương trung bình theo từng phòng ban
+-- =========================================================
 SELECT
-    c.city,
-    SUM(o.total_amount) AS city_total_revenue
-FROM customers c
-JOIN orders o ON o.customer_id = c.customer_id
-GROUP BY c.city
-ORDER BY city_total_revenue DESC;
+    d.dept_name,
+    ROUND(AVG(e.salary), 2) AS avg_salary
+FROM departments d
+JOIN employees e ON e.dept_id = d.dept_id
+GROUP BY d.dept_name
+ORDER BY avg_salary DESC;
 
--- 3b) Chỉ hiện thành phố có tổng doanh thu > 10000
+-- 3b) chỉ hiện phòng ban có lương TB > 15,000,000
 SELECT
-    c.city,
-    SUM(o.total_amount) AS city_total_revenue
-FROM customers c
-JOIN orders o ON o.customer_id = c.customer_id
-GROUP BY c.city
-HAVING SUM(o.total_amount) > 10000
-ORDER BY city_total_revenue DESC;
+    d.dept_name,
+    ROUND(AVG(e.salary), 2) AS avg_salary
+FROM departments d
+JOIN employees e ON e.dept_id = d.dept_id
+GROUP BY d.dept_name
+HAVING AVG(e.salary) > 15000000
+ORDER BY avg_salary DESC;
 
-
--- 4) JOIN 3 bảng: liệt kê sản phẩm đã bán kèm customer_name, order_date, quantity, price
+-- =========================================================
+-- 4) JOIN: liệt kê dự án + phòng ban phụ trách + nhân viên thuộc phòng ban đó
+-- (JOIN 3 bảng: projects, departments, employees)
+-- =========================================================
 SELECT
-    c.customer_name,
-    o.order_date,
-    oi.product_name,
-    oi.quantity,
-    oi.price
-FROM customers c
-JOIN orders o      ON o.customer_id = c.customer_id
-JOIN order_items oi ON oi.order_id = o.order_id
-ORDER BY o.order_date, c.customer_name;
+    p.project_name,
+    d.dept_name,
+    e.emp_name,
+    e.salary
+FROM projects p
+JOIN departments d ON d.dept_id = p.dept_id
+LEFT JOIN employees e ON e.dept_id = d.dept_id
+ORDER BY p.project_id, e.emp_id;
 
-
--- 5) Subquery: tìm tên khách hàng có tổng doanh thu cao nhất
+-- =========================================================
+-- 5) Subquery: nhân viên có lương cao nhất trong MỖI phòng ban
 -- (xử lý cả trường hợp đồng hạng)
-WITH customer_sales AS (
-    SELECT
-        c.customer_id,
-        c.customer_name,
-        SUM(o.total_amount) AS total_spent
-    FROM customers c
-    JOIN orders o ON o.customer_id = c.customer_id
-    GROUP BY c.customer_id, c.customer_name
-)
+-- =========================================================
 SELECT
-    customer_name,
-    total_spent
-FROM customer_sales
-WHERE total_spent = (SELECT MAX(total_spent) FROM customer_sales);
+    d.dept_name,
+    e.emp_name,
+    e.salary
+FROM employees e
+JOIN departments d ON d.dept_id = e.dept_id
+WHERE e.salary = (
+    SELECT MAX(e2.salary)
+    FROM employees e2
+    WHERE e2.dept_id = e.dept_id
+)
+ORDER BY d.dept_name, e.emp_name;
 
-
+-- =========================================================
 -- 6) UNION và INTERSECT
--- 6a) UNION: danh sách tất cả thành phố có khách hàng hoặc có đơn hàng
--- (orders join customers để lấy city; UNION tự loại trùng)
+-- 6a) UNION: phòng ban có nhân viên hoặc có dự án
+-- =========================================================
 (
-    SELECT city FROM customers
+    SELECT DISTINCT d.dept_name
+    FROM departments d
+    JOIN employees e ON e.dept_id = d.dept_id
 )
 UNION
 (
-    SELECT c.city
-    FROM orders o
-    JOIN customers c ON c.customer_id = o.customer_id
-);
+    SELECT DISTINCT d.dept_name
+    FROM departments d
+    JOIN projects p ON p.dept_id = d.dept_id
+)
+ORDER BY dept_name;
 
--- 6b) INTERSECT: thành phố vừa có khách hàng vừa có đơn hàng
+-- =========================================================
+-- 6b) INTERSECT: phòng ban vừa có nhân viên vừa có dự án
+-- =========================================================
 (
-    SELECT city FROM customers
+    SELECT DISTINCT d.dept_name
+    FROM departments d
+    JOIN employees e ON e.dept_id = d.dept_id
 )
 INTERSECT
 (
-    SELECT c.city
-    FROM orders o
-    JOIN customers c ON c.customer_id = o.customer_id
-);
+    SELECT DISTINCT d.dept_name
+    FROM departments d
+    JOIN projects p ON p.dept_id = d.dept_id
+)
+ORDER BY dept_name;
