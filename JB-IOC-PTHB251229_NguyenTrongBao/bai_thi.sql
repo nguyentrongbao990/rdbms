@@ -26,7 +26,7 @@ create table payment(
 	booking_id	INT not null references booking(booking_id),
 	payment_method	VARCHAR(50) not null,
 	payment_date	DATE not null,
-	payment_amount	DECIMAL(10, 2)
+	payment_amount	DECIMAL(10, 2) not null
 );
 --Chèn dữ liệu
 --customer
@@ -62,7 +62,7 @@ insert into payment (booking_id,payment_method,payment_date,payment_amount) valu
 delete from payment
 where payment_method ='Cash' and payment_amount<500;
 --cau 5:
-select customer_id as "mã khách hàng", customer_full_name as "họ tên", customer_email as "email", customer_phone as "địa chỉ"
+select customer_id as "mã khách hàng", customer_full_name as "họ tên", customer_email as "email", customer_phone as "số điện thoại",customer_address as "địa chỉ"
 from customer
 order by customer_full_name asc;
 --cau 6:Lấy thông tin các phòng khách sạn gồm mã phòng, loại phòng, giá phòng và diện tích phòng, sắp xếp theo giá phòng giảm dần.
@@ -94,12 +94,12 @@ offset 1;
 select
 	c.customer_id,
 	c.customer_full_name,
-	count(r.room_id) as so_luong_phong_da_dat
+	count(distinct r.room_id) as so_luong_phong_da_dat
 from customer c
 join booking bk on c.customer_id=bk.customer_id
 join room r on bk.room_id = r.room_id
 group by c.customer_id
-having count(r.room_id) >=2 and sum(bk.total_amount) >1000;
+having count(distinct r.room_id) >=2 and sum(bk.total_amount) >1000;
 --cau 11:
 select
 	r.room_id,
@@ -110,7 +110,7 @@ from room r
 join booking bk on bk.room_id = r.room_id
 join customer c on bk.customer_id = c.customer_id
 group by r.room_id
-having sum(bk.total_amount) <1000 and count(c.customer_id)>=3;
+having sum(bk.total_amount) <1000 and count(distinct c.customer_id)>=3;
 --cau 12:
 select
 	c.customer_id,
@@ -231,7 +231,7 @@ begin
 		raise exception 'booking id khong hop le!';
 	end if;
 	--chen vao bang payment
-	insert into payment(payment_method,payment_amount,payment_date) values
-	(p_payment_method,p_payment_amount,p_payment_date);
+	insert into payment(booking_id,payment_method,payment_amount,payment_date) values
+	(p_booking_id, p_payment_method, p_payment_amount, p_payment_date);
 end;
 $$;
